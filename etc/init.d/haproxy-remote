@@ -1,0 +1,99 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:          haproxy-remote
+# Required-Start:    $haproxy $network
+# Required-Stop:     $haproxy $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Present network interface to HAProxy stats socket
+# Description:       Exposes HAProxy stats socket over TCP using socat so HAProxy may be remotely controlled.
+### END INIT INFO
+
+# Load settings
+. /etc/default/haproxy-remote.conf
+
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+. /lib/lsb/init-functions
+
+INOPTS="fork,setgid=$GROUP,setuid=$USER"
+PIDFILE="/var/run/haproxy-remote-$INPORT.pid"
+OPTS="-d -d -d -lm"	# notice to stderr, then to syslog
+SOCAT="/usr/bin/socat"
+
+test -x $SOCAT  || exit 1
+test -S $SOCKET || exit 1
+
+ARGS="$OPTS TCP-LISTEN:$INPORT,reuseaddr,$INOPTS UNIX-CLIENT:$SOCKET"
+
+start_socat() {
+	start-stop-daemon --oknodo --quiet --start \
+		--pidfile $PIDFILE \
+		--background --make-pidfile \
+		--exec $SOCAT -- $ARGS < /dev/null
+}
+
+stop_socat() {
+	start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE --exec $SOCAT
+	rm -f $PIDFILE
+}
+
+start () {
+	start_socat
+	return $?
+}
+
+stop () {
+	for PID in `ls $PIDFILE 2> /dev/null`; do
+		NAME=`echo $PID | cut -c16-`
+		NAME=${NAME%%.pid}
+		stop_socat
+	done
+}
+
+case "$1" in
+	start)
+		log_daemon_msg "Starting remote HAProxy management" "haproxy-remote"
+		if start ; then
+			log_end_msg $?
+		else
+			log_end_msg $?
+		fi
+		;;
+	stop)
+		log_daemon_msg "Stopping remote HAProxy management" "haproxy-remote"
+		if stop ; then
+			log_end_msg $?
+		else
+			log_end_msg $?
+		fi
+		;;
+	restart|force-reload)
+		log_daemon_msg "Reloading remote HAProxy management" "haproxy-remote"
+		stop
+		if start ; then
+			log_end_msg $?
+		else
+			log_end_msg $?
+		fi
+		;;
+	status)
+		if [ -f "$PIDFILE" ]; then
+			echo "haproxy-remote is running on port $INPORT."
+			exit 0
+		else
+			echo "haproxy-remote is NOT running."
+			exit 1
+		fi
+		;;
+	*)
+		log_failure_msg "Usage: $PROGRAM {start|stop|restart|status}"
+		exit 3
+		;;
+esac
+
+exit 0

@@ -11,7 +11,7 @@
 ### END INIT INFO
 
 # Load settings
-. /etc/default/haproxy-remote.conf
+. /etc/default/haproxy-remote
 
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
